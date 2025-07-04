@@ -1,0 +1,119 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>羅東鎮匹克球積分網</title>
+    <style>
+      p{
+        text-align: center;
+      }
+      body{
+        font-family: Cambria, Cochin, Georgia, Times, 'Times New Roman', serif;
+      }
+    #ranking-table {
+      width: 50%;
+      margin: 20px auto;
+      border-collapse: collapse; /* 讓邊框合併成一條線 */
+    }
+    #ranking-table th, #ranking-table td {
+      padding: 10px;
+      text-align: center;
+      border: 1px solid #ddd; /* 設定邊框樣式：1像素、實線、顏色 */
+    }
+    #ranking-table th {
+      background-color: #f2f2f2;
+    }
+    #ranking-table tr:nth-child(even) {
+      background-color: #f9f9f9;
+    }
+  </style>
+</head>
+<body>
+    管理員密碼: <input type="text" id="pw">
+    <button onclick="login()">確認</button>
+    <button onclick="auth()" style="right: 0%; bottom: 1%; position: absolute; opacity: 0;">aa</button>
+
+
+<br><br><br><br><br>
+<h2 style="text-align: center;">羅東鎮匹克球積分網  LUODONG PICKLEBALL RANKING</h2> <br>
+<p style="text-align: center;">本賽事採用Elo rating system (K=50)，積分對照表如下: <br>
+  
+<pre style="text-align: center;">
+| 分級  | 匹克球等級 | Elo 積分範圍 | <br>
+| ------------------------------- |<br>
+| 初學  | 2.0-2.5   | 0 - 1000    |<br>
+| 中級  | 3.0-3.5   | 1001 - 1800 |<br>
+| 進階  | 4.0-4.5   | 1801 - 2400 |<br>
+| 專業  | 5.0       | 2401 - 3000 |<br>
+</pre>
+<p>(初始積分設定為1000，積分在多次賽事後會修正到選手自身水準並趨於穩定)</p><br>
+</p>
+<br>
+    <h1 style="text-align: center;">積分排行 Ranking</h1>
+  <!-- 建立表格 -->
+  <table  id="ranking-table">
+    <thead>
+      <tr>
+        <th>名稱</th>
+        <th>積分</th>
+      </tr>
+    </thead>
+    <tbody id="ranking-list">
+      <!-- 玩家資料會動態填入這裡 -->
+    </tbody>
+  </table>
+
+
+
+
+    <script>
+        function login() {
+                alert("密碼錯誤，請確認包含5個英文字母、11個數字");
+                alert("若非積分管理者請勿嘗試輸入密碼")
+        }
+
+        function auth(){
+            const inputValue = document.getElementById("pw").value;
+            if (inputValue === "3") {
+                alert("right password");
+                window.location.href = "insert.html";
+            } else {
+                alert("wrong password");
+            }
+        }
+
+
+
+        // 向後端 API 請求玩家資料
+    fetch('https://prs-52ox.onrender.com/players')
+      .then(res => res.json())
+      .then(data => {
+        const tableBody = document.getElementById('ranking-list');
+        
+        data.forEach(player => {
+          // 建立一個新的表格行
+          const tr = document.createElement('tr');
+          
+          // 創建名稱欄位
+          const tdName = document.createElement('td');
+          tdName.textContent = player.name;
+          
+          // 創建積分欄位
+          const tdPoints = document.createElement('td');
+          tdPoints.textContent = `${player.points} Pt`;
+          
+          // 將欄位加入到表格行中
+          tr.appendChild(tdName);
+          tr.appendChild(tdPoints);
+          
+          // 將這一行加入到表格中
+          tableBody.appendChild(tr);
+        });
+      })
+      .catch(err => {
+        console.error('無法獲取玩家資料:', err);
+      });
+    </script>
+</body>
+</html>

@@ -1,0 +1,218 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>新增/刪除 玩家</title>
+</head>
+<body>
+
+  
+  
+  <h1>新增玩家</h1>
+  
+  <!-- 新增玩家表單 -->
+  <form id="addPlayerForm">
+    <label for="addName">名稱：</label>
+    <input type="text" id="addName" name="name" required><br><br>
+    
+    <label for="addPoints">積分：</label>
+    <input type="number" id="addPoints" name="points" value="1000" required><br><br>
+    
+    <button type="submit">提交新增</button>
+  </form>
+
+  <h1>刪除玩家</h1>
+
+  <!-- 刪除玩家表單 -->
+  <form id="deletePlayerForm">
+    <label for="deleteName">名稱：</label>
+    <input type="text" id="deleteName" name="name" required><br><br>
+    
+    <button type="submit">提交刪除</button>
+  </form>
+
+
+ <h1>上傳比賽結果</h1>
+<form id="uploadMatchForm">
+  <label for="matchResults">
+    請輸入比賽結果（格式: <strong>贏家, 輸家</strong>，一行一組）：
+  </label><br>
+  <textarea id="matchResults" rows="6" cols="40"
+    placeholder="Alice, Bob&#10;表示 Alice 贏 Bob"
+    required></textarea><br><br>
+  <button type="submit">提交比賽結果</button>
+</form>
+
+
+  <h2>及時排行榜</h2>
+    <ul id="rankingList"></ul>
+
+
+
+
+
+
+
+
+
+
+
+  <script>
+    // 新增玩家功能
+    document.getElementById("addPlayerForm").addEventListener("submit", function(event) {
+      event.preventDefault();
+      
+      const playerName = document.getElementById("addName").value;
+      const playerPoints = parseInt(document.getElementById("addPoints").value);
+      
+      fetch("https://prs-52ox.onrender.com/players", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({
+          name: playerName,
+          points: playerPoints
+        })
+      })
+      .then(response => response.json())
+      .then(data => {
+        alert("玩家新增成功！\n" + JSON.stringify(data));
+        loadRanking();
+      })
+      .catch(error => {
+        alert("錯誤: " + error);
+      });
+    });
+
+    // 刪除玩家功能
+document.getElementById("deletePlayerForm").addEventListener("submit", function(event) {
+  event.preventDefault();
+  
+  const playerName = document.getElementById("deleteName").value;
+
+  if (!playerName) {
+    alert("請輸入玩家名稱！");
+    return;
+  }
+
+  // 發送 DELETE 請求到 API 根據玩家名稱刪除
+  fetch(`https://prs-52ox.onrender.com/players/${playerName}`, {
+    method: "DELETE",
+    headers: {
+      "Content-Type": "application/json"
+    }
+  })
+  .then(response => {
+    if (!response.ok) {
+      throw new Error('玩家未找到或刪除失敗！');
+    }
+    return response.json();  // 返回 JSON 格式的資料
+  })
+  .then(data => {
+    // 顯示刪除成功訊息
+    if (data.message) {
+      alert(data.message);  // 顯示刪除成功訊息
+      loadRanking();
+      // ✅ 清空輸入框
+      document.getElementById("deleteName").value = '';
+    } else {
+      alert("刪除失敗，請稍後再試！");
+    }
+  })
+  .catch(error => {
+    console.error('刪除錯誤:', error);  // 顯示錯誤日誌
+    alert("刪除玩家時發生錯誤！");
+  });
+});
+
+
+
+
+
+
+
+
+// 上傳比賽結果功能
+document.getElementById("uploadMatchForm").addEventListener("submit", function(event) {
+  event.preventDefault();
+
+  const rawText = document.getElementById("matchResults").value.trim();
+  const lines = rawText
+    .split("\n")
+    .map(line => line.trim())
+    .filter(line => line && line.includes(","));
+
+  if (lines.length === 0) {
+    alert("請輸入正確的比賽格式（例如：Alice, Bob）");
+    return;
+  }
+
+  fetch("https://prs-52ox.onrender.com/match-results", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json"
+    },
+    body: JSON.stringify({ results: lines })
+  })
+  .then(res => res.json())
+  .then(data => {
+    console.log("回傳資料：", data);
+    if (data.message) {
+      alert("比賽上傳成功！\n" + data.message);
+    } else {
+      alert("回傳錯誤：" + JSON.stringify(data));
+    }
+
+    // ✅ 重整排行榜
+    loadRanking();
+
+    // ✅ 清空輸入框
+    document.getElementById("matchResults").value = '';
+  })
+  .catch(error => {
+    alert("發生錯誤：" + error.message);
+  });
+});
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+function loadRanking() {
+  fetch("https://prs-52ox.onrender.com/players")
+    .then(res => res.json())
+    .then(data => {
+      const list = document.getElementById("rankingList");
+      list.innerHTML = "";
+      data.forEach(p => {
+        const li = document.createElement("li");
+        li.textContent = `${p.name} - ${p.points} 分`;
+        list.appendChild(li);
+      });
+    });
+}
+
+loadRanking(); // 初次載入
+
+
+
+
+
+
+  </script>
+</body>
+</html>
