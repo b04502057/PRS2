@@ -30,7 +30,8 @@
   </style>
 </head>
 <body>
-    管理員密碼: <input type="text" id="pw">
+    管理員密碼: 
+    <input id="password" type="password">
     <button onclick="login()">確認</button>
     <button onclick="auth()" style="right: 0%; bottom: 1%; position: absolute; opacity: 0;">aa</button>
 
@@ -114,6 +115,34 @@
       .catch(err => {
         console.error('無法獲取玩家資料:', err);
       });
+
+
+
+
+
+      // login.js
+      function login() {
+        const pwd = document.getElementById("password").value;
+        fetch("https://prs-52ox.onrender.com/api/login", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ password: pwd })
+        })
+          .then((res) => res.json())
+          .then((data) => {
+            if (data.success) {
+              window.location.href = "insert.html";
+            } else {
+              alert("Wrong password");
+            }
+          });
+      }
+
+
+
+
+
+
     </script>
 </body>
 </html>
