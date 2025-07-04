@@ -33,7 +33,7 @@
     管理員密碼: 
     <input id="password" type="password">
     <button onclick="login()">確認</button>
-    <button onclick="auth()" style="right: 0%; bottom: 1%; position: absolute; opacity: 0;">aa</button>
+    <button onclick="auth()" style="right: 0%; bottom: 1%; position: absolute; opacity: 1;">aa</button>
 
 
 <br><br><br><br><br>
@@ -78,7 +78,7 @@
 
 
         // 向後端 API 請求玩家資料
-    fetch('https://prs-52ox.onrender.com/players')
+    fetch('https://prs2.onrender.com/players')
       .then(res => res.json())
       .then(data => {
         const tableBody = document.getElementById('ranking-list');
@@ -122,13 +122,13 @@
           .then((res) => res.json())
           .then((data) => {
             if (data.success) {
-              window.location.href = "insert.html";
+              // 跳轉到後端受保護頁面（token 透過 URL 傳遞）
+              window.location.href = `https://prs2.onrender.com/secret?token=${data.token}`;
             } else {
-              alert("Wrong password");
+              document.getElementById("status").innerText = "Wrong password!";
             }
           });
       }
-
 
 
 
