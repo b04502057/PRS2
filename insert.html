@@ -66,7 +66,7 @@
       const playerName = document.getElementById("addName").value;
       const playerPoints = parseInt(document.getElementById("addPoints").value);
       
-      fetch("https://prs-52ox.onrender.com/players", {
+      fetch("https://prs2.onrender.com/players", {
         method: "POST",
         headers: {
           "Content-Type": "application/json"
@@ -98,7 +98,7 @@ document.getElementById("deletePlayerForm").addEventListener("submit", function(
   }
 
   // 發送 DELETE 請求到 API 根據玩家名稱刪除
-  fetch(`https://prs-52ox.onrender.com/players/${playerName}`, {
+  fetch(`https://prs2.onrender.com/players/${playerName}`, {
     method: "DELETE",
     headers: {
       "Content-Type": "application/json"
@@ -149,7 +149,7 @@ document.getElementById("uploadMatchForm").addEventListener("submit", function(e
     return;
   }
 
-  fetch("https://prs-52ox.onrender.com/match-results", {
+  fetch("https://prs2.onrender.com/match-results", {
     method: "POST",
     headers: {
       "Content-Type": "application/json"
@@ -193,7 +193,7 @@ document.getElementById("uploadMatchForm").addEventListener("submit", function(e
 
 
 function loadRanking() {
-  fetch("https://prs-52ox.onrender.com/players")
+  fetch("https://prs2.onrender.com/players")
     .then(res => res.json())
     .then(data => {
       const list = document.getElementById("rankingList");
