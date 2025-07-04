@@ -33,7 +33,7 @@
     管理員密碼: 
     <input id="password" type="password">
     <button onclick="login()">確認</button>
-    <button onclick="auth()" style="right: 0%; bottom: 1%; position: absolute; opacity: 0;">aa</button>
+    <button onclick="auth()" style="right: 0%; bottom: 1%; position: absolute; opacity: 1;">aa</button>
 
 
 <br><br><br><br><br>
@@ -74,15 +74,6 @@
                 alert("若非積分管理者請勿嘗試輸入密碼")
         }
 
-        function auth(){
-            const inputValue = document.getElementById("pw").value;
-            if (inputValue === "3") {
-                alert("right password");
-                window.location.href = "insert.html";
-            } else {
-                alert("wrong password");
-            }
-        }
 
 
 
@@ -121,9 +112,9 @@
 
 
       // login.js
-      function login() {
+      function auth() {
         const pwd = document.getElementById("password").value;
-        fetch("https://prs-52ox.onrender.com/api/login", {
+        fetch("https://prs2.onrender.com/api/login", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ password: pwd })
