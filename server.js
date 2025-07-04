@@ -168,16 +168,6 @@ app.post('/match-results', (req, res) => {
 
 
 
-app.post("/api/login", express.json(), (req, res) => {
-  const password = req.body.password;
-
-  // 比對密碼（最好是從環境變數或資料庫讀）
-  if (password === process.env.LOGIN_PASSWORD) {
-    res.json({ success: true });
-  } else {
-    res.json({ success: false });
-  }
-});
 
 
 

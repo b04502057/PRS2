@@ -123,7 +123,7 @@
           .then((data) => {
             if (data.success) {
               // 跳轉到後端受保護頁面（token 透過 URL 傳遞）
-              window.location.href = `https://prs2.onrender.com/secret?token=${data.token}`;
+              window.location.href = `insert.html`;
             } else {
               document.getElementById("status").innerText = "Wrong password!";
             }
