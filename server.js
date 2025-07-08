@@ -1,84 +1,64 @@
 const express = require('express');
-const sqlite3 = require('sqlite3').verbose();
+const pool = require('./db');
 const cors = require('cors');
 const app = express();
 const PORT = process.env.PORT || 3000;
 const LOGIN_PASSWORD = process.env.LOGIN_PASSWORD || "123456";
-const TOKEN = "secureToken123"; // 可換成 JWT 或亂碼產生器
+const TOKEN = "secureToken123";
 
-// 中介軟體
 app.use(cors());
 app.use(express.json());
 
-// 資料庫初始化
-const db = new sqlite3.Database('./players.db');
-
-// 建立表格（只執行一次）
-db.run(`
+// 建立資料表（第一次執行自動建立）
+pool.query(`
   CREATE TABLE IF NOT EXISTS players (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    id SERIAL PRIMARY KEY,
     name TEXT NOT NULL,
     points INTEGER DEFAULT 1000
   )
 `);
 
 // API：取得所有玩家
-app.get('/players', (req, res) => {
-  db.all("SELECT * FROM players ORDER BY points DESC", [], (err, rows) => {
-    if (err) {
-      return res.status(500).json({ error: err.message });
-    }
-    res.json(rows);
-  });
+app.get('/players', async (req, res) => {
+  try {
+    const result = await pool.query("SELECT * FROM players ORDER BY points DESC");
+    res.json(result.rows);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
 });
 
 // API：新增玩家
-app.post('/players', (req, res) => {
+app.post('/players', async (req, res) => {
   const { name, points } = req.body;
-  db.run("INSERT INTO players (name, points) VALUES (?, ?)", [name, points || 1000], function(err) {
-    if (err) {
-      return res.status(400).json({ error: err.message });
-    }
-    res.json({ id: this.lastID, name, points });
-  });
+  try {
+    const result = await pool.query(
+      "INSERT INTO players (name, points) VALUES ($1, $2) RETURNING *",
+      [name, points || 1000]
+    );
+    res.json(result.rows[0]);
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
 });
 
-// API：根據名稱刪除玩家
-app.delete('/players/:name', (req, res) => {
-  console.log("Handling DELETE request for: ", req.params.name);  // 這裡打印
-  const playerName = req.params.name;  // 這會從 URL 中擷取名稱
-
-  if (!playerName) {
-    return res.status(400).json({ error: '玩家名稱必須提供' });
-  }
-
-  // 查詢玩家是否存在
-  db.get("SELECT * FROM players WHERE name = ?", [playerName], (err, row) => {
-    if (err) {
-      return res.status(500).json({ error: err.message });
-    }
-    if (!row) {
+// API：刪除玩家
+app.delete('/players/:name', async (req, res) => {
+  const playerName = req.params.name;
+  try {
+    const result = await pool.query("SELECT * FROM players WHERE name = $1", [playerName]);
+    if (result.rows.length === 0) {
       return res.status(404).json({ error: '玩家未找到' });
     }
 
-    // 刪除玩家
-    db.run("DELETE FROM players WHERE name = ?", [playerName], function(err) {
-      if (err) {
-        return res.status(500).json({ error: err.message });
-      }
-      // 如果刪除成功，返回刪除的玩家名稱
-      res.json({ message: `玩家 ${row.name} 已成功刪除！` });
-    });
-  });
+    await pool.query("DELETE FROM players WHERE name = $1", [playerName]);
+    res.json({ message: `玩家 ${playerName} 已成功刪除！` });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
 });
 
-
-
-
-
-
-
-
+// Elo 計算邏輯
 function getExpectedScore(ratingA, ratingB) {
   return 1 / (1 + Math.pow(10, (ratingB - ratingA) / 400));
 }
@@ -87,89 +67,61 @@ function getNewRating(oldRating, expectedScore, actualScore, k = 50) {
   return Math.round(oldRating + k * (actualScore - expectedScore));
 }
 
-
-
-
-
-
-app.post('/match-results', (req, res) => {
+// API：處理比賽結果
+app.post('/match-results', async (req, res) => {
   const { results } = req.body;
-
   if (!Array.isArray(results)) {
     return res.status(400).json({ error: '格式錯誤，應為陣列' });
   }
 
   const updates = [];
 
-  const processNext = (i) => {
-    if (i >= results.length) {
-      return res.json({ message: "處理完成", updates });
-    }
-
-    const line = results[i];
+  for (const line of results) {
     const [winnerRaw, loserRaw] = line.split(",");
     if (!winnerRaw || !loserRaw) {
       updates.push({ error: "格式錯誤", line });
-      return processNext(i + 1);
+      continue;
     }
 
     const winnerName = winnerRaw.trim();
     const loserName = loserRaw.trim();
 
-    db.all("SELECT * FROM players WHERE name IN (?, ?)", [winnerName, loserName], (err, rows) => {
-      if (err || rows.length < 2) {
-        updates.push({ error: "找不到選手", line });
-        return processNext(i + 1);
-      }
-
-      const winner = rows.find(p => p.name === winnerName);
-      const loser = rows.find(p => p.name === loserName);
+    try {
+      const result = await pool.query(
+        "SELECT * FROM players WHERE name = $1 OR name = $2",
+        [winnerName, loserName]
+      );
+      const players = result.rows;
+      const winner = players.find(p => p.name === winnerName);
+      const loser = players.find(p => p.name === loserName);
 
       if (!winner || !loser) {
-        updates.push({ error: "名稱比對錯誤", line });
-        return processNext(i + 1);
+        updates.push({ error: "找不到選手", line });
+        continue;
       }
 
-      // 1. 預期勝率
-        const expectedWinner = getExpectedScore(winner.points, loser.points);
-        const expectedLoser = getExpectedScore(loser.points, winner.points);
+      const expectedWinner = getExpectedScore(winner.points, loser.points);
+      const expectedLoser = getExpectedScore(loser.points, winner.points);
 
-        // 2. 實際比賽結果（贏家 = 1，輸家 = 0）
-        const winnerNewPoints = getNewRating(winner.points, expectedWinner, 1);
-        const loserNewPoints = getNewRating(loser.points, expectedLoser, 0);
+      const winnerNewPoints = getNewRating(winner.points, expectedWinner, 1);
+      const loserNewPoints = getNewRating(loser.points, expectedLoser, 0);
 
-        // 3. 分數變化量
-        const winnerChange = winnerNewPoints - winner.points;
-        const loserChange = loserNewPoints - loser.points;
+      await pool.query("UPDATE players SET points = $1 WHERE name = $2", [winnerNewPoints, winner.name]);
+      await pool.query("UPDATE players SET points = $1 WHERE name = $2", [loserNewPoints, loser.name]);
 
-        // 4. 更新資料庫
-        db.run("UPDATE players SET points = ? WHERE name = ?", [winnerNewPoints, winner.name], (e1) => {
-          if (e1) return processNext(i + 1);
+      updates.push({
+        match: `${winner.name} vs ${loser.name}`,
+        winnerChange: winnerNewPoints - winner.points,
+        loserChange: loserNewPoints - loser.points
+      });
 
-          db.run("UPDATE players SET points = ? WHERE name = ?", [loserNewPoints, loser.name], (e2) => {
-            if (e2) return processNext(i + 1);
+    } catch (err) {
+      updates.push({ error: err.message, line });
+    }
+  }
 
-            updates.push({
-              match: `${winner.name} vs ${loser.name}`,
-              winnerChange,
-              loserChange
-            });
-            processNext(i + 1);
-          });
-        });
-    });
-  };
-
-  processNext(0);
+  res.json({ message: "處理完成", updates });
 });
-
-
-
-
-
-
-
-
 
 // 登入驗證 API
 app.post("/api/login", (req, res) => {
@@ -181,241 +133,17 @@ app.post("/api/login", (req, res) => {
   }
 });
 
-// 保護的秘密頁面，由後端產生整頁內容
+// 測試用的後台畫面
 app.get("/secret", (req, res) => {
   const token = req.query.token;
   if (token === TOKEN) {
-    res.send(`
-      <!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>積分資料處理</title>
-</head>
-<body>
-
-  
-  
-  <h1>新增玩家</h1>
-  
-  <!-- 新增玩家表單 -->
-  <form id="addPlayerForm">
-    <label for="addName">名稱：</label>
-    <input type="text" id="addName" name="name" required><br><br>
-    
-    <label for="addPoints">積分：</label>
-    <input type="number" id="addPoints" name="points" value="1000" required><br><br>
-    
-    <button type="submit">提交新增</button>
-  </form>
-
-  <h1>刪除玩家</h1>
-
-  <!-- 刪除玩家表單 -->
-  <form id="deletePlayerForm">
-    <label for="deleteName">名稱：</label>
-    <input type="text" id="deleteName" name="name" required><br><br>
-    
-    <button type="submit">提交刪除</button>
-  </form>
-
-
- <h1>上傳比賽結果</h1>
-<form id="uploadMatchForm">
-  <label for="matchResults">
-    請輸入比賽結果（格式: <strong>贏家, 輸家</strong>，一行一組）：
-  </label><br>
-  <textarea id="matchResults" rows="6" cols="40"
-    placeholder="Alice, Bob&#10;表示 Alice 贏 Bob"
-    required></textarea><br><br>
-  <button type="submit">提交比賽結果</button>
-</form>
-
-
-  <h2>及時排行榜</h2>
-    <ul id="rankingList"></ul>
-
-
-
-
-
-
-
-
-
-
-
-  <script>
-    // 新增玩家功能
-    document.getElementById("addPlayerForm").addEventListener("submit", function(event) {
-      event.preventDefault();
-      
-      const playerName = document.getElementById("addName").value;
-      const playerPoints = parseInt(document.getElementById("addPoints").value);
-      
-      fetch("https://prs2.onrender.com/players", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json"
-        },
-        body: JSON.stringify({
-          name: playerName,
-          points: playerPoints
-        })
-      })
-      .then(response => response.json())
-      .then(data => {
-        alert("玩家新增成功！\n" + JSON.stringify(data));
-        loadRanking();
-      })
-      .catch(error => {
-        alert("錯誤: " + error);
-      });
-    });
-
-    // 刪除玩家功能
-document.getElementById("deletePlayerForm").addEventListener("submit", function(event) {
-  event.preventDefault();
-  
-  const playerName = document.getElementById("deleteName").value;
-
-  if (!playerName) {
-    alert("請輸入玩家名稱！");
-    return;
-  }
-
-  // 發送 DELETE 請求到 API 根據玩家名稱刪除
-  fetch("https://prs2.onrender.com/players/${playerName}", {
-    method: "DELETE",
-    headers: {
-      "Content-Type": "application/json"
-    }
-  })
-  .then(response => {
-    if (!response.ok) {
-      throw new Error('玩家未找到或刪除失敗！');
-    }
-    return response.json();  // 返回 JSON 格式的資料
-  })
-  .then(data => {
-    // 顯示刪除成功訊息
-    if (data.message) {
-      alert(data.message);  // 顯示刪除成功訊息
-      loadRanking();
-      // ✅ 清空輸入框
-      document.getElementById("deleteName").value = '';
-    } else {
-      alert("刪除失敗，請稍後再試！");
-    }
-  })
-  .catch(error => {
-    console.error('刪除錯誤:', error);  // 顯示錯誤日誌
-    alert("刪除玩家時發生錯誤！");
-  });
-});
-
-
-
-
-
-
-
-
-// 上傳比賽結果功能
-document.getElementById("uploadMatchForm").addEventListener("submit", function(event) {
-  event.preventDefault();
-
-  const rawText = document.getElementById("matchResults").value.trim();
-  const lines = rawText
-    .split("\n")
-    .map(line => line.trim())
-    .filter(line => line && line.includes(","));
-
-  if (lines.length === 0) {
-    alert("請輸入正確的比賽格式（例如：Alice, Bob）");
-    return;
-  }
-
-  fetch("https://prs2.onrender.com/match-results", {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json"
-    },
-    body: JSON.stringify({ results: lines })
-  })
-  .then(res => res.json())
-  .then(data => {
-    console.log("回傳資料：", data);
-    if (data.message) {
-      alert("比賽上傳成功！\n" + data.message);
-    } else {
-      alert("回傳錯誤：" + JSON.stringify(data));
-    }
-
-    // ✅ 重整排行榜
-    loadRanking();
-
-    // ✅ 清空輸入框
-    document.getElementById("matchResults").value = '';
-  })
-  .catch(error => {
-    alert("發生錯誤：" + error.message);
-  });
-});
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-function loadRanking() {
-  fetch("https://prs2.onrender.com/players")
-    .then(res => res.json())
-    .then(data => {
-      const list = document.getElementById("rankingList");
-      list.innerHTML = "";
-      data.forEach(p => {
-        const li = document.createElement("li");
-        li.textContent = "${p.name} - ${p.points} 分";
-        list.appendChild(li);
-      });
-    });
-}
-
-loadRanking(); // 初次載入
-
-
-
-
-
-
-  </script>
-</body>
-</html>
-
-    `);
+    res.send(`<h1>登入成功，你可以管理資料。</h1>`);
   } else {
-    res.status(401).send("Unauthorized: Token 無效或遺失。");
+    res.status(401).send("Unauthorized");
   }
 });
-
-
-
-
 
 // 啟動伺服器
 app.listen(PORT, '0.0.0.0', () => {
-  console.log(`Server running at https://prs2.onrender.com:${process.env.PORT || 3000}`);
+  console.log(`✅ Server is running at http://localhost:${PORT}`);
 });
