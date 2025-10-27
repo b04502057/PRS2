@@ -1,0 +1,105 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Random Name Grouping</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        /* Updated styling for the textarea */
+        textarea {
+            width: 400px;       /* Width of the textarea */
+            height: 450px;      /* Height with multiple rows */
+            padding: 10px;
+            font-size: 16px;
+            margin: 10px;
+            border: 1px solid #ccc;
+            border-radius: 5px;
+            resize: none; /* Prevent resizing of the textarea */
+        }
+
+        button {
+            padding: 10px;
+            margin: 10px;
+            font-size: 16px;
+            cursor: pointer;
+        }
+
+        .group-list {
+            margin-top: 20px;
+        }
+
+        .group-item {
+            padding: 8px;
+            margin: 5px;
+            background-color: #f0f0f0;
+            border-radius: 5px;
+        }
+    </style>
+</head>
+<body>
+    <h1>Random Name Grouping</h1>
+
+    <!-- Textarea to enter names -->
+    <textarea id="nameInput" placeholder="Enter names, one per line, separated by commas"></textarea>
+
+    <!-- Button to trigger the grouping -->
+    <button onclick="groupNames()">Generate Random Groups</button>
+
+    <!-- Display the random groups here -->
+    <div class="group-list" id="groupList"></div>
+
+    <script>
+        function groupNames() {
+            // Get the input value and split into an array of names by new lines
+            const input = document.getElementById('nameInput').value.trim();
+            const names = input.split('\n').map(name => name.trim()).filter(name => name.length > 0);
+
+            // If there are less than two names, show an error message
+            if (names.length < 2) {
+                alert('Please enter at least two names!');
+                return;
+            }
+
+            // Shuffle the names array
+            shuffleArray(names);
+
+            // Create pairs of names
+            const groups = [];
+            for (let i = 0; i < names.length; i += 2) {
+                if (i + 1 < names.length) {
+                    groups.push([names[i], names[i + 1]]);
+                } else {
+                    groups.push([names[i], 'No Pair']);
+                }
+            }
+
+            // Display the groups on the page
+            const groupListDiv = document.getElementById('groupList');
+            groupListDiv.innerHTML = ''; // Clear any previous groups
+
+            groups.forEach(group => {
+                const groupItem = document.createElement('div');
+                groupItem.classList.add('group-item');
+                groupItem.textContent = `${group[0]} & ${group[1]}`;
+                groupListDiv.appendChild(groupItem);
+            });
+        }
+
+        // Helper function to shuffle the names array
+        function shuffleArray(array) {
+            for (let i = array.length - 1; i > 0; i--) {
+                const j = Math.floor(Math.random() * (i + 1));
+                [array[i], array[j]] = [array[j], array[i]];
+            }
+        }
+    </script>
+</body>
+</html>
